@@ -1,5 +1,5 @@
 """
-VPT script  ver： Mar 25th 19:20
+VPT script  ver： Mar 26th 14:00
 
 """
 import timm
@@ -20,6 +20,7 @@ class VPT_ViT(VisionTransformer):
         super().__init__(img_size, patch_size, in_chans, num_classes, embed_dim, depth, num_heads, mlp_ratio, qkv_bias,
                          representation_size, distilled, drop_rate, attn_drop_rate, drop_path_rate, embed_layer,
                          norm_layer, act_layer, weight_init)
+
         self.VPT_type = VPT_type
         if VPT_type == "Deep":
             self.Prompt_Tokens = nn.Parameter(torch.zeros(depth, Prompt_Token_num, embed_dim))
@@ -36,6 +37,16 @@ class VPT_ViT(VisionTransformer):
         self.Prompt_Tokens.requires_grad = True
         for param in self.head.parameters():
             param.requires_grad = True
+
+    def obtain_prompt(self):
+        prompt_state_dict = {'head': self.head.state_dict(),
+                             'Prompt_Tokens': self.Prompt_Tokens}
+        # print(prompt_state_dict)
+        return prompt_state_dict
+
+    def load_prompt(self, prompt_state_dict):
+        self.head.load_state_dict(prompt_state_dict['head'])
+        self.Prompt_Tokens = prompt_state_dict['Prompt_Tokens']
 
     def forward_features(self, x):
         x = self.patch_embed(x)
