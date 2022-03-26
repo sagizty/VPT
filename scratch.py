@@ -30,6 +30,9 @@ labels = torch.ones(batch_size).long()  # long ones
 
 model = build_promptmodel(num_classes=3, edge_size=edge_size, model_idx='ViT', patch_size=16,
                           Prompt_Token_num=10, VPT_type="Deep")  # VPT_type = "Shallow"
+# test for updating
+prompt_state_dict = model.obtain_prompt()
+model.load_prompt(prompt_state_dict)
 
 optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=0.01)
 criterion = nn.CrossEntropyLoss()
