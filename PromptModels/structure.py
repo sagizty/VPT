@@ -1,8 +1,10 @@
 """
-VPT script  ver： Mar 26th 14:00
+VPT     Script  ver： Apr 21th 14:00
 
+based on
+timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
 """
-import timm
+
 
 import torch
 import torch.nn as nn
@@ -14,12 +16,16 @@ class VPT_ViT(VisionTransformer):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
                  num_heads=8, mlp_ratio=4., qkv_bias=True, representation_size=None, distilled=False,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0., embed_layer=PatchEmbed, norm_layer=None,
-                 act_layer=None, weight_init='', Prompt_Token_num=1, VPT_type="Shallow"):
+                 act_layer=None, weight_init='', Prompt_Token_num=1, VPT_type="Shallow", basic_state_dict=None):
 
         # Recreate ViT
         super().__init__(img_size, patch_size, in_chans, num_classes, embed_dim, depth, num_heads, mlp_ratio, qkv_bias,
                          representation_size, distilled, drop_rate, attn_drop_rate, drop_path_rate, embed_layer,
                          norm_layer, act_layer, weight_init)
+
+        # load basic state_dict
+        if basic_state_dict is not None:
+            self.load_state_dict(basic_state_dict, False)
 
         self.VPT_type = VPT_type
         if VPT_type == "Deep":
@@ -35,8 +41,11 @@ class VPT_ViT(VisionTransformer):
             param.requires_grad = False
 
         self.Prompt_Tokens.requires_grad = True
-        for param in self.head.parameters():
-            param.requires_grad = True
+        try:
+            for param in self.head.parameters():
+                param.requires_grad = True
+        except:
+            pass
 
     def obtain_prompt(self):
         prompt_state_dict = {'head': self.head.state_dict(),
@@ -64,21 +73,30 @@ class VPT_ViT(VisionTransformer):
             for i in range(len(self.blocks)):
                 # concatenate Prompt_Tokens
                 Prompt_Tokens = self.Prompt_Tokens[i].unsqueeze(0)
+                # firstly concatenate
                 x = torch.cat((x, Prompt_Tokens.expand(x.shape[0], -1, -1)), dim=1)
                 num_tokens = x.shape[1]
+                # lastly remove, a genius trick
                 x = self.blocks[i](x)[:, :num_tokens - Prompt_Token_num]
 
         else:  # self.VPT_type == "Shallow"
+            num_tokens = x.shape[1]
+            Prompt_Token_num = self.Prompt_Tokens.shape[1]
+
             # concatenate Prompt_Tokens
             Prompt_Tokens = self.Prompt_Tokens.expand(x.shape[0], -1, -1)
             x = torch.cat((x, Prompt_Tokens), dim=1)
-            # Sequntially procees
-            x = self.blocks(x)
+            # Sequntially procees，lastly remove prompt tokens
+            x = self.blocks(x)[:, :num_tokens - Prompt_Token_num]
 
         x = self.norm(x)
-        return self.pre_logits(x[:, 0])  # use cls token for cls head
+        return x
 
     def forward(self, x):
+
         x = self.forward_features(x)
+
+        # use cls token for cls head
+        x = self.pre_logits(x[:, 0, :])
         x = self.head(x)
         return x
