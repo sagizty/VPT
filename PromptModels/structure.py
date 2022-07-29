@@ -1,5 +1,5 @@
 """
-VPT     Script  ver： Apr 21th 14:00
+VPT     Script  ver： July 23th 13:00
 
 based on
 timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
@@ -14,14 +14,16 @@ from timm.models.vision_transformer import VisionTransformer, PatchEmbed
 
 class VPT_ViT(VisionTransformer):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
-                 num_heads=8, mlp_ratio=4., qkv_bias=True, representation_size=None, distilled=False,
-                 drop_rate=0., attn_drop_rate=0., drop_path_rate=0., embed_layer=PatchEmbed, norm_layer=None,
-                 act_layer=None, weight_init='', Prompt_Token_num=1, VPT_type="Shallow", basic_state_dict=None):
+                 num_heads=8, mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
+                 embed_layer=PatchEmbed, norm_layer=None, act_layer=None, Prompt_Token_num=1,
+                 VPT_type="Shallow", basic_state_dict=None):
 
         # Recreate ViT
-        super().__init__(img_size, patch_size, in_chans, num_classes, embed_dim, depth, num_heads, mlp_ratio, qkv_bias,
-                         representation_size, distilled, drop_rate, attn_drop_rate, drop_path_rate, embed_layer,
-                         norm_layer, act_layer, weight_init)
+        super().__init__(img_size=img_size, patch_size=patch_size, in_chans=in_chans, num_classes=num_classes,
+                         embed_dim=embed_dim, depth=depth, num_heads=num_heads, mlp_ratio=mlp_ratio,
+                         qkv_bias=qkv_bias, drop_rate=drop_rate, attn_drop_rate=attn_drop_rate,
+                         drop_path_rate=drop_path_rate, embed_layer=embed_layer,
+                         norm_layer=norm_layer, act_layer=act_layer)
 
         # load basic state_dict
         if basic_state_dict is not None:
@@ -80,13 +82,13 @@ class VPT_ViT(VisionTransformer):
                 x = self.blocks[i](x)[:, :num_tokens - Prompt_Token_num]
 
         else:  # self.VPT_type == "Shallow"
-            num_tokens = x.shape[1]
             Prompt_Token_num = self.Prompt_Tokens.shape[1]
 
             # concatenate Prompt_Tokens
             Prompt_Tokens = self.Prompt_Tokens.expand(x.shape[0], -1, -1)
             x = torch.cat((x, Prompt_Tokens), dim=1)
-            # Sequntially procees，lastly remove prompt tokens
+            num_tokens = x.shape[1]
+            # Sequntially procees
             x = self.blocks(x)[:, :num_tokens - Prompt_Token_num]
 
         x = self.norm(x)
