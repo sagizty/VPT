@@ -14,7 +14,7 @@ from timm.models.vision_transformer import VisionTransformer, PatchEmbed
 
 class VPT_ViT(VisionTransformer):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
-                 num_heads=8, mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
+                 num_heads=12, mlp_ratio=4., qkv_bias=True, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
                  embed_layer=PatchEmbed, norm_layer=None, act_layer=None, Prompt_Token_num=1,
                  VPT_type="Shallow", basic_state_dict=None):
 
@@ -49,6 +49,10 @@ class VPT_ViT(VisionTransformer):
         except:
             pass
 
+    def UnFreeze(self):
+        for param in self.parameters():
+            param.requires_grad = True
+
     def obtain_prompt(self):
         prompt_state_dict = {'head': self.head.state_dict(),
                              'Prompt_Tokens': self.Prompt_Tokens}
@@ -56,8 +60,26 @@ class VPT_ViT(VisionTransformer):
         return prompt_state_dict
 
     def load_prompt(self, prompt_state_dict):
-        self.head.load_state_dict(prompt_state_dict['head'])
-        self.Prompt_Tokens = prompt_state_dict['Prompt_Tokens']
+        try:
+            self.head.load_state_dict(prompt_state_dict['head'], False)
+        except:
+            print('head not match, so skip head')
+        else:
+            print('prompt head match')
+
+        if self.Prompt_Tokens.shape == prompt_state_dict['Prompt_Tokens'].shape:
+
+            # device check
+            Prompt_Tokens = nn.Parameter(prompt_state_dict['Prompt_Tokens'].cpu())
+            Prompt_Tokens.to(torch.device(self.Prompt_Tokens.device))
+
+            self.Prompt_Tokens = Prompt_Tokens
+
+        else:
+            print('\n !!! cannot load prompt')
+            print('shape of model req prompt', self.Prompt_Tokens.shape)
+            print('shape of model given prompt', prompt_state_dict['Prompt_Tokens'].shape)
+            print('')
 
     def forward_features(self, x):
         x = self.patch_embed(x)
@@ -102,3 +124,4 @@ class VPT_ViT(VisionTransformer):
         x = self.pre_logits(x[:, 0, :])
         x = self.head(x)
         return x
+
