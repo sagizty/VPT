@@ -1,5 +1,5 @@
 """
-VPT     Script  ver： July 23th 13:00
+VPT     Script  ver： June 19th 14:20
 
 based on
 timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
@@ -121,7 +121,7 @@ class VPT_ViT(VisionTransformer):
         x = self.forward_features(x)
 
         # use cls token for cls head
-        x = self.pre_logits(x[:, 0, :])
+        x = self.fc_norm(x[:, 0, :])  # fixme for old timm: x = self.pre_logits(x[:, 0, :])
         x = self.head(x)
         return x
 
